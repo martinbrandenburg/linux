@@ -128,6 +128,15 @@ static void orangefs_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
 	struct orangefs_inode_s *orangefs_inode = ORANGEFS_I(inode);
+	struct orangefs_cached_xattr *cx;
+	struct hlist_node *tmp;
+	int i;
+
+	hash_for_each_safe(orangefs_inode->xattr_cache, i, tmp, cx, node) {
+		hlist_del(&cx->node);
+		kfree(cx);
+	}
+
 	kmem_cache_free(orangefs_inode_cache, orangefs_inode);
 }
 
