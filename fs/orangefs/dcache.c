@@ -9,7 +9,6 @@
  *  Implementation of dentry (directory cache) functions.
  */
 
-#include "protocol.h"
 #include "orangefs-kernel.h"
 
 /* Returns 1 if dentry can still be trusted, else 0. */

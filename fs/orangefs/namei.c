@@ -9,7 +9,6 @@
  *  Linux VFS namei operations.
  */
 
-#include "protocol.h"
 #include "orangefs-kernel.h"
 
 /*

@@ -7,7 +7,6 @@
  * See COPYING in top-level directory.
  */
 
-#include "protocol.h"
 #include "orangefs-kernel.h"
 #include "orangefs-debugfs.h"
 #include "orangefs-sysfs.h"

@@ -13,7 +13,6 @@
  *  In-kernel waitqueue operations.
  */
 
-#include "protocol.h"
 #include "orangefs-kernel.h"
 #include "orangefs-bufmap.h"
 

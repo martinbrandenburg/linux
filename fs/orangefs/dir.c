@@ -3,7 +3,6 @@
  * Copyright 2017 Omnibond Systems, L.L.C.
  */
 
-#include "protocol.h"
 #include "orangefs-kernel.h"
 #include "orangefs-bufmap.h"
 

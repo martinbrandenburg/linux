@@ -9,7 +9,6 @@
  *  Linux VFS file operations.
  */
 
-#include "protocol.h"
 #include "orangefs-kernel.h"
 #include "orangefs-bufmap.h"
 #include <linux/fs.h>

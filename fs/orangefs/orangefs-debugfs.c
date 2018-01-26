@@ -40,9 +40,9 @@
 
 #include <linux/uaccess.h>
 
-#include "orangefs-debugfs.h"
-#include "protocol.h"
 #include "orangefs-kernel.h"
+#include "orangefs-debug.h"
+#include "orangefs-debugfs.h"
 
 #define DEBUG_HELP_STRING_SIZE 4096
 #define HELP_STRING_UNINITIALIZED \

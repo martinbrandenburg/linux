@@ -5,9 +5,7 @@
  * See COPYING in top-level directory.
  */
 #include <linux/kernel.h>
-#include "protocol.h"
 #include "orangefs-kernel.h"
-#include "orangefs-dev-proto.h"
 #include "orangefs-bufmap.h"
 
 __s32 fsid_of_op(struct orangefs_kernel_op_s *op)

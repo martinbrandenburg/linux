@@ -8,9 +8,7 @@
  * See COPYING in top-level directory.
  */
 
-#include "protocol.h"
 #include "orangefs-kernel.h"
-#include "orangefs-dev-proto.h"
 #include "orangefs-bufmap.h"
 #include "orangefs-debugfs.h"
 

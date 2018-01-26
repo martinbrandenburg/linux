@@ -10,7 +10,6 @@
  */
 
 #include <linux/bvec.h>
-#include "protocol.h"
 #include "orangefs-kernel.h"
 #include "orangefs-bufmap.h"
 

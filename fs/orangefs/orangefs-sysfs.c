@@ -135,7 +135,6 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-#include "protocol.h"
 #include "orangefs-kernel.h"
 #include "orangefs-sysfs.h"
 

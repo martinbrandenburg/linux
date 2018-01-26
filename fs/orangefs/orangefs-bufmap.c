@@ -4,7 +4,6 @@
  *
  * See COPYING in top-level directory.
  */
-#include "protocol.h"
 #include "orangefs-kernel.h"
 #include "orangefs-bufmap.h"
 
