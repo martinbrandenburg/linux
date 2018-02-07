@@ -418,8 +418,8 @@ static ssize_t orangefs_file_write_iter(struct kiocb *iocb, struct iov_iter *ite
 
 	/* Make sure generic_write_checks sees an up to date inode size. */
 	if (file->f_flags & O_APPEND) {
-		rc = orangefs_inode_getattr(file->f_mapping->host, 0, 1,
-		    STATX_SIZE);
+		rc = orangefs_inode_getattr(file->f_mapping->host,
+		    ORANGEFS_GETATTR_SIZE);
 		if (rc == -ESTALE)
 			rc = -EIO;
 		if (rc) {
@@ -526,8 +526,8 @@ static int orangefs_fault(struct vm_fault *vmf)
 {
 	struct file *file = vmf->vma->vm_file;
 	int rc;
-	rc = orangefs_inode_getattr(file->f_mapping->host, 0, 1,
-	    STATX_SIZE);
+	rc = orangefs_inode_getattr(file->f_mapping->host,
+	    ORANGEFS_GETATTR_SIZE);
 	if (rc == -ESTALE)
 		rc = -EIO;
 	if (rc) {
@@ -652,8 +652,8 @@ static loff_t orangefs_file_llseek(struct file *file, loff_t offset, int origin)
 		 * NOTE: We are only interested in file size here,
 		 * so we set mask accordingly.
 		 */
-		ret = orangefs_inode_getattr(file->f_mapping->host, 0, 1,
-		    STATX_SIZE);
+		ret = orangefs_inode_getattr(file->f_mapping->host,
+		    ORANGEFS_GETATTR_SIZE);
 		if (ret == -ESTALE)
 			ret = -EIO;
 		if (ret) {
