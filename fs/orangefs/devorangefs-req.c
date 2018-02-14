@@ -11,6 +11,7 @@
 #include "orangefs-kernel.h"
 #include "orangefs-bufmap.h"
 #include "orangefs-debugfs.h"
+#include "orangefs-trace.h"
 
 #include <linux/debugfs.h>
 #include <linux/slab.h>
@@ -180,8 +181,10 @@ static ssize_t orangefs_devreq_read(struct file *file,
 	}
 
 	/* Check for an empty list before locking. */
-	if (list_empty(&orangefs_request_list))
+	if (list_empty(&orangefs_request_list)) {
+		trace_orangefs_devreq_read(0, 1, NULL);
 		return -EAGAIN;
+	}
 
 restart:
 	cur_op = NULL;
@@ -250,6 +253,7 @@ restart:
 	 */
 	if (!cur_op) {
 		spin_unlock(&orangefs_request_list_lock);
+		trace_orangefs_devreq_read(0, 0, NULL);
 		return -EAGAIN;
 	}
 
@@ -314,6 +318,7 @@ restart:
 	spin_unlock(&cur_op->lock);
 	spin_unlock(&orangefs_htable_ops_in_progress_lock);
 
+	trace_orangefs_devreq_read(1, 0, cur_op);
 	/* The client only asks to read one size buffer. */
 	return MAX_DEV_REQ_UPSIZE;
 error:
@@ -340,6 +345,7 @@ error:
 		complete(&cur_op->waitq);
 	}
 	spin_unlock(&orangefs_request_list_lock);
+	trace_orangefs_devreq_read(0, 0, cur_op);
 	return -EFAULT;
 }
 
@@ -474,6 +480,7 @@ static ssize_t orangefs_devreq_write_iter(struct kiocb *iocb,
 	}
 
 wakeup:
+	trace_orangefs_devreq_write_iter(op);
 	/*
 	 * Return to vfs waitqueue, and back to service_operation
 	 * through wait_for_matching_downcall. 
@@ -781,11 +788,14 @@ static __poll_t orangefs_devreq_poll(struct file *file,
 				      struct poll_table_struct *poll_table)
 {
 	__poll_t poll_revent_mask = 0;
+	int empty;
 
 	poll_wait(file, &orangefs_request_list_waitq, poll_table);
 
-	if (!list_empty(&orangefs_request_list))
+	empty = list_empty(&orangefs_request_list);
+	if (!empty)
 		poll_revent_mask |= EPOLLIN;
+	trace_orangefs_devreq_poll(empty);
 	return poll_revent_mask;
 }
 
