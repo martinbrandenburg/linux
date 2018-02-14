@@ -158,8 +158,7 @@ ssize_t orangefs_inode_getxattr(struct inode *inode, const char *name,
 	 */
 	new_op->upcall.req.getxattr.key_sz = strlen(name) + 1;
 
-	ret = service_operation(new_op, "orangefs_inode_getxattr",
-				get_interruptible_flag(inode));
+	ret = service_operation(new_op, get_interruptible_flag(inode));
 	if (ret != 0) {
 		if (ret == -ENOENT) {
 			ret = -ENODATA;
@@ -265,9 +264,7 @@ static int orangefs_inode_removexattr(struct inode *inode, const char *name,
 		     (char *)new_op->upcall.req.removexattr.key,
 		     (int)new_op->upcall.req.removexattr.key_sz);
 
-	ret = service_operation(new_op,
-				"orangefs_inode_removexattr",
-				get_interruptible_flag(inode));
+	ret = service_operation(new_op, get_interruptible_flag(inode));
 	if (ret == -ENOENT) {
 		/*
 		 * Request to replace a non-existent attribute is an error.
@@ -363,9 +360,7 @@ int orangefs_inode_setxattr(struct inode *inode, const char *name,
 		     (int)new_op->upcall.req.setxattr.keyval.key_sz,
 		     size);
 
-	ret = service_operation(new_op,
-				"orangefs_inode_setxattr",
-				get_interruptible_flag(inode));
+	ret = service_operation(new_op, get_interruptible_flag(inode));
 
 	gossip_debug(GOSSIP_XATTR_DEBUG,
 		     "orangefs_inode_setxattr: returning %d\n",
@@ -427,8 +422,7 @@ try_again:
 	new_op->upcall.req.listxattr.token = token;
 	new_op->upcall.req.listxattr.requested_count =
 	    (size == 0) ? 0 : ORANGEFS_MAX_XATTR_LISTLEN;
-	ret = service_operation(new_op, __func__,
-				get_interruptible_flag(inode));
+	ret = service_operation(new_op, get_interruptible_flag(inode));
 	if (ret != 0)
 		goto done;
 

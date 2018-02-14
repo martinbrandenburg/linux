@@ -42,7 +42,7 @@ static int orangefs_create(struct inode *dir,
 	strncpy(new_op->upcall.req.create.d_name,
 		dentry->d_name.name, ORANGEFS_NAME_MAX - 1);
 
-	ret = service_operation(new_op, __func__, get_interruptible_flag(dir));
+	ret = service_operation(new_op, get_interruptible_flag(dir));
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "%s: %pd: handle:%pU: fsid:%d: new_op:%p: ret:%d:\n",
@@ -150,7 +150,7 @@ static struct dentry *orangefs_lookup(struct inode *dir, struct dentry *dentry,
 		     &new_op->upcall.req.lookup.parent_refn.khandle,
 		     new_op->upcall.req.lookup.parent_refn.fs_id);
 
-	ret = service_operation(new_op, __func__, get_interruptible_flag(dir));
+	ret = service_operation(new_op, get_interruptible_flag(dir));
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "Lookup Got %pU, fsid %d (ret=%d)\n",
@@ -245,8 +245,7 @@ static int orangefs_unlink(struct inode *dir, struct dentry *dentry)
 	strncpy(new_op->upcall.req.remove.d_name, dentry->d_name.name,
 		ORANGEFS_NAME_MAX - 1);
 
-	ret = service_operation(new_op, "orangefs_unlink",
-				get_interruptible_flag(inode));
+	ret = service_operation(new_op, get_interruptible_flag(inode));
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "%s: service_operation returned:%d:\n",
@@ -302,7 +301,7 @@ static int orangefs_symlink(struct inode *dir,
 		ORANGEFS_NAME_MAX - 1);
 	strncpy(new_op->upcall.req.sym.target, symname, ORANGEFS_NAME_MAX - 1);
 
-	ret = service_operation(new_op, __func__, get_interruptible_flag(dir));
+	ret = service_operation(new_op, get_interruptible_flag(dir));
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "Symlink Got ORANGEFS handle %pU on fsid %d (ret=%d)\n",
@@ -373,7 +372,7 @@ static int orangefs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode
 	strncpy(new_op->upcall.req.mkdir.d_name,
 		dentry->d_name.name, ORANGEFS_NAME_MAX - 1);
 
-	ret = service_operation(new_op, __func__, get_interruptible_flag(dir));
+	ret = service_operation(new_op, get_interruptible_flag(dir));
 
 	gossip_debug(GOSSIP_NAME_DEBUG,
 		     "Mkdir Got ORANGEFS handle %pU on fsid %d\n",
@@ -458,7 +457,6 @@ static int orangefs_rename(struct inode *old_dir,
 		ORANGEFS_NAME_MAX - 1);
 
 	ret = service_operation(new_op,
-				"orangefs_rename",
 				get_interruptible_flag(old_dentry->d_inode));
 
 	gossip_debug(GOSSIP_NAME_DEBUG,

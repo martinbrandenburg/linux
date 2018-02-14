@@ -180,7 +180,7 @@ static int orangefs_setattr_size(struct inode *inode, struct iattr *iattr)
 	new_op->upcall.req.truncate.refn = orangefs_inode->refn;
 	new_op->upcall.req.truncate.size = (__s64) iattr->ia_size;
 
-	ret = service_operation(new_op, __func__,
+	ret = service_operation(new_op,
 				get_interruptible_flag(inode));
 
 	/*

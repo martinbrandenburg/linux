@@ -176,7 +176,7 @@ static int orangefs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	if (ORANGEFS_SB(sb)->flags & ORANGEFS_OPT_INTR)
 		flags = ORANGEFS_OP_INTERRUPTIBLE;
 
-	ret = service_operation(new_op, "orangefs_statfs", flags);
+	ret = service_operation(new_op, flags);
 
 	if (new_op->downcall.status < 0)
 		goto out_op_release;
@@ -258,7 +258,7 @@ int orangefs_remount(struct orangefs_sb_info_s *orangefs_sb)
 	 * request_mutex to prevent other operations from bypassing
 	 * this one
 	 */
-	ret = service_operation(new_op, "orangefs_remount",
+	ret = service_operation(new_op,
 		ORANGEFS_OP_PRIORITY | ORANGEFS_OP_NO_MUTEX);
 	gossip_debug(GOSSIP_SUPER_DEBUG,
 		     "orangefs_remount: mount got return value of %d\n",
@@ -280,7 +280,7 @@ int orangefs_remount(struct orangefs_sb_info_s *orangefs_sb)
 		if (!new_op)
 			return -ENOMEM;
 		new_op->upcall.req.features.features = 0;
-		ret = service_operation(new_op, "orangefs_features",
+		ret = service_operation(new_op,
 		    ORANGEFS_OP_PRIORITY | ORANGEFS_OP_NO_MUTEX);
 		if (!ret)
 			orangefs_features =
@@ -392,7 +392,7 @@ static int orangefs_unmount(int id, __s32 fs_id, const char *devname)
 	op->upcall.req.fs_umount.fs_id = fs_id;
 	strncpy(op->upcall.req.fs_umount.orangefs_config_server,
 	    devname, ORANGEFS_MAX_SERVER_ADDR_LEN - 1);
-	r = service_operation(op, "orangefs_fs_umount", 0);
+	r = service_operation(op, 0);
 	/* Not much to do about an error here. */
 	if (r)
 		gossip_err("orangefs_unmount: service_operation %d\n", r);
@@ -492,7 +492,7 @@ struct dentry *orangefs_mount(struct file_system_type *fst,
 		     "Attempting ORANGEFS Mount via host %s\n",
 		     new_op->upcall.req.fs_mount.orangefs_config_server);
 
-	ret = service_operation(new_op, "orangefs_mount", 0);
+	ret = service_operation(new_op, 0);
 	gossip_debug(GOSSIP_SUPER_DEBUG,
 		     "orangefs_mount: mount got return value of %d\n", ret);
 	if (ret)
@@ -553,7 +553,7 @@ struct dentry *orangefs_mount(struct file_system_type *fst,
 		if (!new_op)
 			return ERR_PTR(-ENOMEM);
 		new_op->upcall.req.features.features = 0;
-		ret = service_operation(new_op, "orangefs_features", 0);
+		ret = service_operation(new_op, 0);
 		orangefs_features = new_op->downcall.resp.features.features;
 		op_release(new_op);
 	} else {

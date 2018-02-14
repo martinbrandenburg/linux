@@ -439,9 +439,7 @@ extern const struct dentry_operations orangefs_dentry_operations;
 #define ORANGEFS_OP_NO_MUTEX      8   /* don't acquire request_mutex */
 #define ORANGEFS_OP_ASYNC         16  /* Queue it, but don't wait */
 
-int service_operation(struct orangefs_kernel_op_s *op,
-		      const char *op_name,
-		      int flags);
+int service_operation(struct orangefs_kernel_op_s *, int);
 
 #define get_interruptible_flag(inode) \
 	((ORANGEFS_SB(inode->i_sb)->flags & ORANGEFS_OPT_INTR) ? \

@@ -303,7 +303,6 @@ static ssize_t sysfs_service_op_show(struct kobject *kobj,
 {
 	struct orangefs_kernel_op_s *new_op = NULL;
 	int rc = 0;
-	char *ser_op_type = NULL;
 	__u32 op_alloc_type;
 
 	gossip_debug(GOSSIP_SYSFS_DEBUG,
@@ -461,17 +460,11 @@ static ssize_t sysfs_service_op_show(struct kobject *kobj,
 		goto out;
 	}
 
-
-	if (strcmp(kobj->name, PC_KOBJ_ID))
-		ser_op_type = "orangefs_param";
-	else
-		ser_op_type = "orangefs_perf_count";
-
 	/*
 	 * The service_operation will return an errno return code on
 	 * error, and zero on success.
 	 */
-	rc = service_operation(new_op, ser_op_type, ORANGEFS_OP_INTERRUPTIBLE);
+	rc = service_operation(new_op, ORANGEFS_OP_INTERRUPTIBLE);
 
 out:
 	if (!rc) {
@@ -792,7 +785,7 @@ value_set:
 	 * The service_operation will return a errno return code on
 	 * error, and zero on success.
 	 */
-	rc = service_operation(new_op, "orangefs_param", ORANGEFS_OP_INTERRUPTIBLE);
+	rc = service_operation(new_op, ORANGEFS_OP_INTERRUPTIBLE);
 
 	if (rc < 0) {
 		gossip_err("sysfs_service_op_store: service op returned:%d:\n",

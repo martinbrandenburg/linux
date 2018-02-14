@@ -304,8 +304,7 @@ int orangefs_inode_getattr(struct inode *inode, int new, int bypass,
 		new_op->upcall.req.getattr.mask =
 		    ORANGEFS_ATTR_SYS_ALL_NOHINT & ~ORANGEFS_ATTR_SYS_SIZE;
 
-	ret = service_operation(new_op, __func__,
-	    get_interruptible_flag(inode));
+	ret = service_operation(new_op, get_interruptible_flag(inode));
 	if (ret != 0)
 		goto out;
 
@@ -419,8 +418,7 @@ int orangefs_inode_check_changed(struct inode *inode)
 	new_op->upcall.req.getattr.mask = ORANGEFS_ATTR_SYS_TYPE |
 	    ORANGEFS_ATTR_SYS_LNK_TARGET;
 
-	ret = service_operation(new_op, __func__,
-	    get_interruptible_flag(inode));
+	ret = service_operation(new_op, get_interruptible_flag(inode));
 	if (ret != 0)
 		goto out;
 
@@ -451,8 +449,7 @@ int orangefs_inode_setattr(struct inode *inode, struct iattr *iattr)
 		       &new_op->upcall.req.setattr.attributes,
 		       iattr);
 	if (ret >= 0) {
-		ret = service_operation(new_op, __func__,
-				get_interruptible_flag(inode));
+		ret = service_operation(new_op, get_interruptible_flag(inode));
 
 		gossip_debug(GOSSIP_UTILS_DEBUG,
 			     "orangefs_inode_setattr: returning %d\n",

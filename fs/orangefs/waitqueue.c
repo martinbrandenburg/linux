@@ -15,6 +15,7 @@
 
 #include "orangefs-kernel.h"
 #include "orangefs-bufmap.h"
+#include "orangefs-trace.h"
 
 static int wait_for_matching_downcall(struct orangefs_kernel_op_s *, long, bool);
 static void orangefs_clean_up_interrupted_operation(struct orangefs_kernel_op_s *);
@@ -57,9 +58,7 @@ void purge_waiting_ops(void)
  *
  * Returns contents of op->downcall.status for convenience
  */
-int service_operation(struct orangefs_kernel_op_s *op,
-		      const char *op_name,
-		      int flags)
+int service_operation(struct orangefs_kernel_op_s *op, int flags)
 {
 	long timeout = MAX_SCHEDULE_TIMEOUT;
 	int ret = 0;
@@ -74,10 +73,11 @@ retry_servicing:
 	gossip_debug(GOSSIP_WAIT_DEBUG,
 		     "%s: %s op:%p: process:%s: pid:%d:\n",
 		     __func__,
-		     op_name,
+		     get_opname_string(op),
 		     op,
 		     current->comm,
 		     current->pid);
+	trace_orangefs_service_operation(op, flags);
 
 	/*
 	 * If ORANGEFS_OP_NO_MUTEX was set in flags, we need to avoid
@@ -159,8 +159,7 @@ retry_servicing:
 	/* failed to get matching downcall */
 	if (ret == -ETIMEDOUT) {
 		gossip_err("%s: %s -- wait timed out; aborting attempt.\n",
-			   __func__,
-			   op_name);
+			   __func__, get_opname_string(op));
 	}
 
 	/*
@@ -178,7 +177,7 @@ retry_servicing:
 			     "orangefs: tag %llu (%s)"
 			     " -- operation to be retried (%d attempt)\n",
 			     llu(op->tag),
-			     op_name,
+			     get_opname_string(op),
 			     op->attempts);
 
 		/*
@@ -194,7 +193,7 @@ out:
 	gossip_debug(GOSSIP_WAIT_DEBUG,
 		     "%s: %s returning: %d for %p.\n",
 		     __func__,
-		     op_name,
+		     get_opname_string(op),
 		     ret,
 		     op);
 	return ret;

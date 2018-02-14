@@ -85,8 +85,7 @@ again:
 
 	op->upcall.req.readdir.buf_index = bufi;
 
-	r = service_operation(op, "orangefs_readdir",
-	    get_interruptible_flag(dentry->d_inode));
+	r = service_operation(op, get_interruptible_flag(dentry->d_inode));
 
 	orangefs_readdir_index_put(bufi);
 

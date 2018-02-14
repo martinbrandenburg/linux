@@ -512,9 +512,7 @@ static ssize_t orangefs_debug_write(struct file *file,
 			c_mask.mask2);
 
 		/* service_operation returns 0 on success... */
-		rc = service_operation(new_op,
-				       "orangefs_param",
-					ORANGEFS_OP_INTERRUPTIBLE);
+		rc = service_operation(new_op, ORANGEFS_OP_INTERRUPTIBLE);
 
 		if (rc)
 			gossip_debug(GOSSIP_DEBUGFS_DEBUG,

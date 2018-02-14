@@ -41,8 +41,7 @@ static int orangefs_revalidate_lookup(struct dentry *dentry)
 		     __LINE__,
 		     get_interruptible_flag(parent_inode));
 
-	err = service_operation(new_op, "orangefs_lookup",
-			get_interruptible_flag(parent_inode));
+	err = service_operation(new_op, get_interruptible_flag(parent_inode));
 
 	/* Positive dentry: reject if error or not the same inode. */
 	if (inode) {

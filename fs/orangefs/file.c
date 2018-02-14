@@ -30,8 +30,7 @@ static int flush_racache(struct inode *inode)
 		return -ENOMEM;
 	new_op->upcall.req.ra_cache_flush.refn = orangefs_inode->refn;
 
-	ret = service_operation(new_op, "orangefs_flush_racache",
-	    get_interruptible_flag(inode));
+	ret = service_operation(new_op, get_interruptible_flag(inode));
 
 	gossip_debug(GOSSIP_UTILS_DEBUG, "%s: got return value of %d\n",
 	    __func__, ret);
@@ -110,11 +109,7 @@ populate_shared_memory:
 		     llu(new_op->tag));
 
 	/* Stage 2: Service the I/O operation */
-	ret = service_operation(new_op,
-				type == ORANGEFS_IO_WRITE ?
-					"file_write" :
-					"file_read",
-				get_interruptible_flag(inode));
+	ret = service_operation(new_op, get_interruptible_flag(inode));
 
 	/*
 	 * If service_operation() returns -EAGAIN #and# the operation was
@@ -627,7 +622,6 @@ static int orangefs_fsync(struct file *file,
 	new_op->upcall.req.fsync.refn = orangefs_inode->refn;
 
 	ret = service_operation(new_op,
-			"orangefs_fsync",
 			get_interruptible_flag(file_inode(file)));
 
 	gossip_debug(GOSSIP_FILE_DEBUG,
