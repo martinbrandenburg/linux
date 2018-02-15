@@ -270,7 +270,8 @@ again:
 		new_op->upcall.req.getattr.mask =
 		    ORANGEFS_ATTR_SYS_ALL_NOHINT & ~ORANGEFS_ATTR_SYS_SIZE;
 
-	ret = service_operation(new_op, get_interruptible_flag(inode));
+	ret = service_operation(new_op,
+	    get_interruptible_flag(inode));
 	if (ret != 0)
 		goto out;
 
@@ -429,7 +430,8 @@ int orangefs_inode_setattr(struct inode *inode)
 	orangefs_inode->attr_valid = 0;
 	spin_unlock(&inode->i_lock);
 
-	ret = service_operation(new_op, get_interruptible_flag(inode));
+	ret = service_operation(new_op,
+	    get_interruptible_flag(inode) | ORANGEFS_OP_WRITEBACK);
 	gossip_debug(GOSSIP_UTILS_DEBUG,
 	    "orangefs_inode_setattr: returning %d\n", ret);
 	if (ret)
