@@ -44,8 +44,8 @@ static int flush_racache(struct inode *inode)
  * Post and wait for the I/O upcall to finish
  */
 ssize_t wait_for_direct_io(enum ORANGEFS_io_type type, struct inode *inode,
-		loff_t *offset, struct iov_iter *iter,
-		size_t total_size, loff_t readahead_size)
+    loff_t *offset, struct iov_iter *iter, size_t total_size,
+    loff_t readahead_size, struct orangefs_write_request *wr)
 {
 	struct orangefs_inode_s *orangefs_inode = ORANGEFS_I(inode);
 	struct orangefs_khandle *handle = &orangefs_inode->refn.khandle;
@@ -100,6 +100,10 @@ populate_shared_memory:
 			gossip_err("%s: Failed to copy-in buffers. Please make sure that the pvfs2-client is running. %ld\n",
 			    __func__, (long)ret);
 			goto out;
+		}
+		if (wr) {
+			new_op->upcall.uid = from_kuid(&init_user_ns, wr->uid);
+			new_op->upcall.gid = from_kgid(&init_user_ns, wr->gid);
 		}
 	}
 
@@ -286,7 +290,7 @@ ssize_t do_readv_writev(enum ORANGEFS_io_type type, struct file *file,
 			     (int)*offset);
 
 		ret = wait_for_direct_io(type, inode, offset, iter,
-				each_count, 0);
+				each_count, 0, NULL);
 		gossip_debug(GOSSIP_FILE_DEBUG,
 			     "%s(%pU): return from wait_for_io:%d\n",
 			     __func__,
@@ -428,7 +432,7 @@ static int orangefs_fault(struct vm_fault *vmf)
 const struct vm_operations_struct orangefs_file_vm_ops = {
 	.fault = orangefs_fault,
 	.map_pages = filemap_map_pages,
-	.page_mkwrite = filemap_page_mkwrite,
+	.page_mkwrite = orangefs_page_mkwrite,
 };
 
 /*

@@ -179,6 +179,14 @@ static inline void set_op_state_purged(struct orangefs_kernel_op_s *op)
 	}
 }
 
+struct orangefs_write_request {
+	loff_t pos;
+	unsigned len;
+	kuid_t uid;
+	kgid_t gid;
+	int mwrite;
+};
+
 /* per inode private orangefs info */
 struct orangefs_inode_s {
 	struct orangefs_object_kref refn;
@@ -343,6 +351,8 @@ void fsid_key_table_finalize(void);
 /*
  * defined in inode.c
  */
+int orangefs_page_mkwrite(struct vm_fault *);
+
 struct inode *orangefs_new_inode(struct super_block *sb,
 			      struct inode *dir,
 			      int mode,
@@ -384,7 +394,7 @@ bool __is_daemon_in_service(void);
  * defined in file.c
  */
 ssize_t wait_for_direct_io(enum ORANGEFS_io_type, struct inode *, loff_t *,
-    struct iov_iter *, size_t, loff_t);
+    struct iov_iter *, size_t, loff_t, struct orangefs_write_request *);
 ssize_t do_readv_writev(enum ORANGEFS_io_type, struct file *, loff_t *,
     struct iov_iter *);
 
