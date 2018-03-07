@@ -63,6 +63,21 @@ TRACE_EVENT(orangefs_devreq_write_iter,
     )
 );
 
+TRACE_EVENT(orangefs_early_writeback,
+    TP_PROTO(int reason),
+    TP_ARGS(reason),
+    TP_STRUCT__entry(
+        __field(int, reason)
+    ),
+    TP_fast_assign(
+        __entry->reason = reason;
+    ),
+    TP_printk(
+        "%s", __entry->reason == 0 ? "invalidatepage" :
+            (__entry->reason == 1 ? "noncontiguous" : "uid/gid")
+    )
+);
+
 TRACE_EVENT(orangefs_service_operation,
     TP_PROTO(struct orangefs_kernel_op_s *op, int flags),
     TP_ARGS(op, flags),
@@ -79,6 +94,41 @@ TRACE_EVENT(orangefs_service_operation,
     TP_printk(
         "op_name=%s flags=%d attempts=%d", __entry->op_name, __entry->flags,
         __entry->attempts
+    )
+);
+
+TRACE_EVENT(orangefs_readpage,
+    TP_PROTO(loff_t off, size_t len),
+    TP_ARGS(off, len),
+    TP_STRUCT__entry(
+        __field(loff_t, off)
+        __field(size_t, len)
+    ),
+    TP_fast_assign(
+        __entry->off = off;
+        __entry->len = len;
+    ),
+    TP_printk(
+        "off=%lld len=%ld", __entry->off, __entry->len
+    )
+);
+
+TRACE_EVENT(orangefs_writepage,
+    TP_PROTO(loff_t off, size_t len, int mwrite),
+    TP_ARGS(off, len, mwrite),
+    TP_STRUCT__entry(
+        __field(loff_t, off)
+        __field(size_t, len)
+        __field(int, mwrite)
+    ),
+    TP_fast_assign(
+        __entry->off = off;
+        __entry->len = len;
+        __entry->mwrite = mwrite;
+    ),
+    TP_printk(
+        "off=%lld len=%ld mwrite=%s", __entry->off, __entry->len,
+            __entry->mwrite ? "yes" : "no"
     )
 );
 

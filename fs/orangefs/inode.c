@@ -13,6 +13,7 @@
 #include <linux/bvec.h>
 #include "orangefs-kernel.h"
 #include "orangefs-bufmap.h"
+#include "orangefs-trace.h"
 
 static int orangefs_writepage_locked(struct page *page,
     struct writeback_control *wbc)
@@ -51,6 +52,8 @@ static int orangefs_writepage_locked(struct page *page,
 
 	}
 
+	trace_orangefs_writepage(off, wlen, wr->mwrite);
+
 	bv.bv_page = page;
 	bv.bv_len = wlen;
 	bv.bv_offset = 0;
@@ -82,20 +85,24 @@ static int do_writepage_if_necessary(struct page *page, loff_t pos,
 	};
 	int r;
 	if (PagePrivate(page)) {
+		int noncontig;
 		wr = (struct orangefs_write_request *)page_private(page);
 		BUG_ON(!wr);
+ 		noncontig = pos + len < wr->pos || wr->pos + wr->len < pos;
 		/*
 		 * If the new request is not contiguous with the last one or if
 		 * the uid or gid is different, the page must be written out
 		 * before continuing.
 		 */
-		if (pos + len < wr->pos || wr->pos + wr->len < pos ||
+		if (noncontig ||
 		    !uid_eq(current_fsuid(), wr->uid) ||
 		    !gid_eq(current_fsgid(), wr->gid)) {
 			wbc.range_start = page_file_offset(page);
 			wbc.range_end = wbc.range_start + PAGE_SIZE - 1;
 			wait_on_page_writeback(page);
 			if (clear_page_dirty_for_io(page)) {
+				trace_orangefs_early_writeback(noncontig ?
+				    1 : 2);
 				r = orangefs_writepage_locked(page, &wbc);
 				if (r)
 					return r;
@@ -205,6 +212,7 @@ static int orangefs_readpage(struct file *file, struct page *page)
 	loff_t off;
 
 	off = page_offset(page);
+	trace_orangefs_readpage(off, PAGE_SIZE);
 	bv.bv_page = page;
 	bv.bv_len = PAGE_SIZE;
 	bv.bv_offset = 0;
@@ -278,6 +286,7 @@ static void orangefs_invalidatepage(struct page *page,
 			wbc.range_end = wbc.range_start + PAGE_SIZE - 1;
 			wait_on_page_writeback(page);
 			if (clear_page_dirty_for_io(page)) {
+				trace_orangefs_early_writeback(0);
 				r = orangefs_writepage_locked(page, &wbc);
 				if (r)
 					return;
