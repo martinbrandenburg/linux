@@ -438,6 +438,8 @@ again:
 			ORANGEFS_I(inode)->attr_valid = iattr->ia_valid;
 		} else {
 			spin_unlock(&inode->i_lock);
+			trace_orangefs_early_setattr(inode,
+			    ORANGEFS_I(inode)->attr_valid, iattr->ia_valid);
 			write_inode_now(inode, 1);
 			goto again;
 		}
@@ -446,6 +448,8 @@ again:
 		ORANGEFS_I(inode)->attr_uid = current_fsuid();
 		ORANGEFS_I(inode)->attr_gid = current_fsgid();
 	}
+	trace_orangefs_setattr(inode, ORANGEFS_I(inode)->attr_valid,
+	    iattr->ia_valid);
 	setattr_copy(inode, iattr);
 	spin_unlock(&inode->i_lock);
 	mark_inode_dirty(inode);
@@ -492,6 +496,7 @@ int orangefs_getattr(const struct path *path, struct kstat *stat,
 	gossip_debug(GOSSIP_INODE_DEBUG,
 		     "orangefs_getattr: called on %pd mask %u\n",
 		     path->dentry, request_mask);
+	trace_orangefs_getattr(inode, request_mask);
 
 	ret = orangefs_inode_getattr(inode,
 	    request_mask & STATX_SIZE ? ORANGEFS_GETATTR_SIZE : 0);

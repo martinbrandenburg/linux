@@ -8,6 +8,7 @@
 #include <linux/kernel.h>
 #include "orangefs-kernel.h"
 #include "orangefs-bufmap.h"
+#include "orangefs-trace.h"
 
 __s32 fsid_of_op(struct orangefs_kernel_op_s *op)
 {
@@ -423,7 +424,7 @@ int orangefs_inode_setattr(struct inode *inode)
 {
 	struct orangefs_inode_s *orangefs_inode = ORANGEFS_I(inode);
 	struct orangefs_kernel_op_s *new_op;
-	int ret;
+	int attr_valid, ret;
 
 	new_op = op_alloc(ORANGEFS_VFS_OP_SETATTR);
 	if (!new_op)
@@ -435,6 +436,7 @@ int orangefs_inode_setattr(struct inode *inode)
 	new_op->upcall.req.setattr.refn = orangefs_inode->refn;
 	copy_attributes_from_inode(inode,
 	    &new_op->upcall.req.setattr.attributes);
+	attr_valid = orangefs_inode->attr_valid;
 	orangefs_inode->attr_valid = 0;
 	if (!new_op->upcall.req.setattr.attributes.mask) {
 		spin_unlock(&inode->i_lock);
@@ -442,6 +444,8 @@ int orangefs_inode_setattr(struct inode *inode)
 		return 0;
 	}
 	spin_unlock(&inode->i_lock);
+
+	trace_orangefs_write_inode(inode, attr_valid);
 
 	ret = service_operation(new_op,
 	    get_interruptible_flag(inode) | ORANGEFS_OP_WRITEBACK);

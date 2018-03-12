@@ -63,6 +63,32 @@ TRACE_EVENT(orangefs_devreq_write_iter,
     )
 );
 
+TRACE_EVENT(orangefs_early_setattr,
+    TP_PROTO(struct inode *inode, int attr_valid, int ia_valid),
+    TP_ARGS(inode, attr_valid, ia_valid),
+    TP_STRUCT__entry(
+        __array(unsigned char, u, 16)
+        __field(__s32, fs_id)
+        __field(int, attr_valid)
+        __field(int, ia_valid)
+    ),
+    TP_fast_assign(
+        memcpy(__entry->u, ORANGEFS_I(inode)->refn.khandle.u, 16);
+        __entry->fs_id = ORANGEFS_I(inode)->refn.fs_id;
+        __entry->attr_valid = attr_valid;
+        __entry->ia_valid = ia_valid;
+    ),
+    TP_printk(
+        "khandle=%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-"
+            "%02x%02x%02x%02x%02x%02x fs_id=%d attr_valid=%d ia_valid=%d",
+            __entry->u[0], __entry->u[1], __entry->u[2], __entry->u[3],
+            __entry->u[4], __entry->u[5], __entry->u[6], __entry->u[7],
+            __entry->u[8], __entry->u[9], __entry->u[10], __entry->u[11],
+            __entry->u[12], __entry->u[13], __entry->u[14], __entry->u[15],
+            __entry->fs_id, __entry->attr_valid, __entry->ia_valid
+    )
+);
+
 TRACE_EVENT(orangefs_early_writeback,
     TP_PROTO(int reason),
     TP_ARGS(reason),
@@ -75,6 +101,56 @@ TRACE_EVENT(orangefs_early_writeback,
     TP_printk(
         "%s", __entry->reason == 0 ? "invalidatepage" :
             (__entry->reason == 1 ? "noncontiguous" : "uid/gid")
+    )
+);
+
+TRACE_EVENT(orangefs_getattr,
+    TP_PROTO(struct inode *inode, int request_mask),
+    TP_ARGS(inode, request_mask),
+    TP_STRUCT__entry(
+        __array(unsigned char, u, 16)
+        __field(__s32, fs_id)
+        __field(int, request_mask)
+    ),
+    TP_fast_assign(
+        memcpy(__entry->u, ORANGEFS_I(inode)->refn.khandle.u, 16);
+        __entry->fs_id = ORANGEFS_I(inode)->refn.fs_id;
+        __entry->request_mask = request_mask;
+    ),
+    TP_printk(
+        "khandle=%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-"
+            "%02x%02x%02x%02x%02x%02x fs_id=%d request_mask=%d",
+            __entry->u[0], __entry->u[1], __entry->u[2], __entry->u[3],
+            __entry->u[4], __entry->u[5], __entry->u[6], __entry->u[7],
+            __entry->u[8], __entry->u[9], __entry->u[10], __entry->u[11],
+            __entry->u[12], __entry->u[13], __entry->u[14], __entry->u[15],
+            __entry->fs_id, __entry->request_mask
+    )
+);
+
+TRACE_EVENT(orangefs_setattr,
+    TP_PROTO(struct inode *inode, int attr_valid, int ia_valid),
+    TP_ARGS(inode, attr_valid, ia_valid),
+    TP_STRUCT__entry(
+        __array(unsigned char, u, 16)
+        __field(__s32, fs_id)
+        __field(int, attr_valid)
+        __field(int, ia_valid)
+    ),
+    TP_fast_assign(
+        memcpy(__entry->u, ORANGEFS_I(inode)->refn.khandle.u, 16);
+        __entry->fs_id = ORANGEFS_I(inode)->refn.fs_id;
+        __entry->attr_valid = attr_valid;
+        __entry->ia_valid = ia_valid;
+    ),
+    TP_printk(
+        "khandle=%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-"
+            "%02x%02x%02x%02x%02x%02x fs_id=%d attr_valid=%d ia_valid=%d",
+            __entry->u[0], __entry->u[1], __entry->u[2], __entry->u[3],
+            __entry->u[4], __entry->u[5], __entry->u[6], __entry->u[7],
+            __entry->u[8], __entry->u[9], __entry->u[10], __entry->u[11],
+            __entry->u[12], __entry->u[13], __entry->u[14], __entry->u[15],
+            __entry->fs_id, __entry->attr_valid, __entry->ia_valid
     )
 );
 
@@ -110,6 +186,30 @@ TRACE_EVENT(orangefs_readpage,
     ),
     TP_printk(
         "off=%lld len=%ld", __entry->off, __entry->len
+    )
+);
+
+TRACE_EVENT(orangefs_write_inode,
+    TP_PROTO(struct inode *inode, int attr_valid),
+    TP_ARGS(inode, attr_valid),
+    TP_STRUCT__entry(
+        __array(unsigned char, u, 16)
+        __field(__s32, fs_id)
+        __field(int, attr_valid)
+    ),
+    TP_fast_assign(
+        memcpy(__entry->u, ORANGEFS_I(inode)->refn.khandle.u, 16);
+        __entry->fs_id = ORANGEFS_I(inode)->refn.fs_id;
+        __entry->attr_valid = attr_valid;
+    ),
+    TP_printk(
+        "khandle=%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-"
+            "%02x%02x%02x%02x%02x%02x fs_id=%d attr_valid=%d",
+            __entry->u[0], __entry->u[1], __entry->u[2], __entry->u[3],
+            __entry->u[4], __entry->u[5], __entry->u[6], __entry->u[7],
+            __entry->u[8], __entry->u[9], __entry->u[10], __entry->u[11],
+            __entry->u[12], __entry->u[13], __entry->u[14], __entry->u[15],
+            __entry->fs_id, __entry->attr_valid
     )
 );
 
