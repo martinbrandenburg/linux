@@ -241,18 +241,91 @@ out:
 	return ret;
 }
 
+int orangefs_revalidate_mapping(struct inode *inode)
+{
+	struct orangefs_inode_s *orangefs_inode = ORANGEFS_I(inode);
+	struct address_space *mapping = inode->i_mapping;
+	unsigned long *bitlock = &orangefs_inode->bitlock;
+	int ret;
+	/* read_iter, write_iter, mmap */
+
+/*	printk("revalidate_mapping\n");*/
+
+	/* XXX do we need to look at pulling new attributes?  especially in
+	 * the append/write to/past end of file case */
+
+	while (1) {
+		ret = wait_on_bit(bitlock, 1, TASK_KILLABLE);
+		if (ret)
+			return ret;
+		spin_lock(&inode->i_lock);
+		if (test_bit(1, bitlock)) {
+			spin_unlock(&inode->i_lock);
+			continue;
+		}
+	/* XXX.... but with this 069 runs fast and 075 fails
+	 * I need 069 to be fast and 075 to pass */
+/* XXX I might need something more NFS like with a cache validity
+and figure out where I need...
+*/
+		if (!time_before(jiffies, orangefs_inode->mapping_time))
+			break;
+		spin_unlock(&inode->i_lock);
+		return 0;
+	}
+
+	set_bit(1, bitlock);
+	smp_wmb();
+	spin_unlock(&inode->i_lock);
+
+	unmap_mapping_range(mapping, 0, 0, 0);
+	ret = filemap_write_and_wait(mapping);
+	/* XXX uh? */
+	ret = invalidate_inode_pages2(mapping);
+
+	orangefs_inode->mapping_time = jiffies + 50*HZ/1000;
+
+	clear_bit(1, bitlock);
+	smp_mb__after_atomic();
+	wake_up_bit(bitlock, 1);
+
+	return 0;
+}
+
 static ssize_t orangefs_file_read_iter(struct kiocb *iocb,
     struct iov_iter *iter)
 {
+	int ret;
 	orangefs_stats.reads++;
-	return generic_file_read_iter(iocb, iter);
+
+	down_read(&file_inode(iocb->ki_filp)->i_rwsem);
+	ret = orangefs_revalidate_mapping(file_inode(iocb->ki_filp));
+	if (ret)
+		goto out;
+
+/*	printk("read_iter pos %llx count %lx\n", iocb->ki_pos, iov_iter_count(iter));*/
+	ret = generic_file_read_iter(iocb, iter);
+out:
+	up_read(&file_inode(iocb->ki_filp)->i_rwsem);
+/*	printk("read_iter return %x\n", ret);*/
+	return ret;
 }
 
 static ssize_t orangefs_file_write_iter(struct kiocb *iocb,
     struct iov_iter *iter)
 {
+	int ret;
 	orangefs_stats.writes++;
-	return generic_file_write_iter(iocb, iter);
+
+	if (iocb->ki_pos > i_size_read(file_inode(iocb->ki_filp))) {
+		ret = orangefs_revalidate_mapping(file_inode(iocb->ki_filp));
+		if (ret)
+			return ret;
+	}
+
+/*	printk("write_iter pos %llx count %lx\n", iocb->ki_pos, iov_iter_count(iter));*/
+	ret = generic_file_write_iter(iocb, iter);
+	return ret;
 }
 
 /*
@@ -318,6 +391,7 @@ static vm_fault_t orangefs_fault(struct vm_fault *vmf)
 {
 	struct file *file = vmf->vma->vm_file;
 	int ret;
+/*	printk("orangefs_fault %lx\n", vmf->pgoff);*/
 	ret = orangefs_inode_getattr(file->f_mapping->host,
 	    ORANGEFS_GETATTR_SIZE);
 	if (ret == -ESTALE)
@@ -341,6 +415,12 @@ static const struct vm_operations_struct orangefs_file_vm_ops = {
  */
 static int orangefs_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
+	int ret;
+
+	ret = orangefs_revalidate_mapping(file_inode(file));
+	if (ret)
+		return ret;
+
 	gossip_debug(GOSSIP_FILE_DEBUG,
 		     "orangefs_file_mmap: called on %s\n",
 		     (file ?

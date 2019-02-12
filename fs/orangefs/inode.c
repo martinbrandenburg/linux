@@ -31,6 +31,18 @@ static int orangefs_writepage_locked(struct page *page,
 	len = i_size_read(inode);
 	if (PagePrivate(page)) {
 		wr = (struct orangefs_write_range *)page_private(page);
+		/* XXX shouldn't this have been handled in
+		 * orangefs_invalidatepage like it says below??? */
+		/* XXX it seems i_size gets updated before writeout somehow?
+		 * with revalidate now
+		 * I've hacked a fix here and in writepages skipping but
+		 * somehow that doesn't seem right */
+		if (wr->pos >= len) {
+/*			printk("writepage.. skipping this...\n");*/
+			/* there's nothing to do... */
+			ret = 0;
+			goto done;
+		}
 		off = wr->pos;
 		if (off + wr->len > len)
 			wlen = len - off;
@@ -53,8 +65,10 @@ static int orangefs_writepage_locked(struct page *page,
 	WARN_ON(wlen == 0);
 	iov_iter_bvec(&iter, WRITE, &bv, 1, wlen);
 
+/*	printk("in writepage_locked off %llx len %lx\n", off, wlen);*/
 	ret = wait_for_direct_io(ORANGEFS_IO_WRITE, inode, &off, &iter, wlen,
 	    len, wr);
+done:
 	if (ret < 0) {
 		SetPageError(page);
 		mapping_set_error(page->mapping, ret);
@@ -102,8 +116,7 @@ static int orangefs_writepages_work(struct orangefs_writepages *ow,
 	int i;
 
 	len = i_size_read(inode);
-	if (ow->off + ow->len > len)
-		ow->len = len - ow->off;
+
 	for (i = 0; i < ow->npages; i++) {
 		set_page_writeback(ow->pages[i]);
 		ow->bv[i].bv_page = ow->pages[i];
@@ -115,11 +128,33 @@ static int orangefs_writepages_work(struct orangefs_writepages *ow,
 	}
 	iov_iter_bvec(&iter, WRITE, ow->bv, ow->npages, ow->len);
 
+/*	printk("early writepages_work off %llx len %lx i_size %lx\n", ow->off, ow->len, len);*/
+	if (ow->off >= len) {
+/*		printk("skipping this...\n");*/
+		/* there's nothing to do... */
+		ret = 0;
+		goto mark_pages;
+	} else {
+		if (ow->off + ow->len > len)
+			ow->len = len - ow->off;
+		/* else len is fine */
+	}
+
+	/* if it's nonsense we get stuck... */
+/*	printk("in writepages_work off %llx len %lx\n", ow->off, ow->len);*/
+
+	/* XXX */
+	if (ow->len > 1073741824) {
+		printk("len is too big; replacing with 1024...\n");
+		ow->len = 1024;
+	}
+
 	off = ow->off;
 	wr.uid = ow->uid;
 	wr.gid = ow->gid;
 	ret = wait_for_direct_io(ORANGEFS_IO_WRITE, inode, &off, &iter, ow->len,
 	    0, &wr);
+mark_pages:
 	if (ret < 0) {
 		for (i = 0; i < ow->npages; i++) {
 			SetPageError(ow->pages[i]);
@@ -250,6 +285,8 @@ static int orangefs_writepages(struct address_space *mapping,
 	return ret;
 }
 
+static int orangefs_launder_page(struct page *);
+
 static int orangefs_readpage(struct file *file, struct page *page)
 {
 	struct inode *inode = page->mapping->host;
@@ -263,6 +300,25 @@ static int orangefs_readpage(struct file *file, struct page *page)
 	bv.bv_len = PAGE_SIZE;
 	bv.bv_offset = 0;
 	iov_iter_bvec(&iter, READ, &bv, 1, PAGE_SIZE);
+
+	/* XXX okay... */
+/*	printk("orangefs_readpage DIRTY %d i_size %llx\n", PageDirty(page), inode->i_size);*/
+	if (PageDirty(page)) {
+	/* let's try this... surely it won't destroy everything */
+/*		printk("so we launder...\n");*/
+		orangefs_launder_page(page);
+		/* uh is this alright not to setuptodate?
+		 * maybe I need to force a write here? 
+		 *
+		 * without write seems to work alright
+		 * but... it's possible we do getattr
+		 * which drops the size we know until
+		 * we do the writeout so...
+		 * */
+/*		unlock_page(page);
+		/* XXX uh... 
+		return 0;*/
+	}
 
 	ret = wait_for_direct_io(ORANGEFS_IO_READ, inode, &off, &iter,
 	    PAGE_SIZE, inode->i_size, NULL);
@@ -283,8 +339,6 @@ static int orangefs_readpage(struct file *file, struct page *page)
 	return ret;
 }
 
-static int orangefs_launder_page(struct page *);
-
 int orangefs_write_begin(struct file *file, struct address_space *mapping,
     loff_t pos, unsigned len, unsigned flags, struct page **pagep,
     void **fsdata)
@@ -300,6 +354,7 @@ int orangefs_write_begin(struct file *file, struct address_space *mapping,
 
 	index = pos >> PAGE_SHIFT;
 
+#if 0
 	page = grab_cache_page_write_begin(mapping, index, flags);
 	if (!page) {
 		kfree(wr);
@@ -307,6 +362,39 @@ int orangefs_write_begin(struct file *file, struct address_space *mapping,
 	}
 
 	*pagep = page;
+#endif
+{
+        struct page *page;
+        int fgp_flags = FGP_LOCK|FGP_WRITE;
+
+        if (flags & AOP_FLAG_NOFS)
+                fgp_flags |= FGP_NOFS;
+
+        page = pagecache_get_page(mapping, index, fgp_flags,
+                        mapping_gfp_mask(mapping));
+        if (page) {
+
+		/* XXX but now the page may stick around
+		 * even though it's only partially written to...
+		 */
+
+/*		printk("write_begin no create %llx\n", page_offset(page));*/
+                wait_for_stable_page(page);
+	} else {
+        	page = pagecache_get_page(mapping, index, fgp_flags|FGP_CREAT,
+                        mapping_gfp_mask(mapping));
+        	if (page) {
+/*			printk("write_begin had to create %llx\n", page_offset(page));*/
+       	        	wait_for_stable_page(page);
+		}
+	}
+
+	*pagep = page;
+
+}
+	page = *pagep;
+
+/*	printk("write_begin pos %llx len %x copied %x\n", pos, len, len);*/
 
 	if (PageDirty(page) && !PagePrivate(page)) {
 		/*
@@ -342,21 +430,98 @@ int orangefs_write_begin(struct file *file, struct address_space *mapping,
 	get_page(page);
 okay:
 
+	/* so if we partially write to a page we zero the other
+	 bits if it's not uptodate....
+	 so... how does it get marked uptodate
+	so that mapread doesn't
+
+IS THIS TRUE?  IF A PAGE IS NOT UPTODATE IT CANNOT BE MAPREAD
+WITHOUT GOING THROUGH READPAGE???? I THINK
+
+so how does it get marked uptodate?
+
+simple_write_end does it!
+shall I??? look at nfs
+
+*/
+
+	/* this didn't fix it...
+which means
+
+I think the page was never read?
+because we have zeroes and we shouldn't...
+
+*/
+#if 0
 	if (!PageUptodate(page) && (len != PAGE_SIZE)) {
 		unsigned from = pos & (PAGE_SIZE - 1);
+		printk("zero_user_segments %x %x\n", from, from + len);
 
 		zero_user_segments(page, 0, from, from + len, PAGE_SIZE);
 	}
+#endif
 	return 0;
 }
 
 int orangefs_write_end(struct file *file, struct address_space *mapping,
     loff_t pos, unsigned len, unsigned copied, struct page *page, void *fsdata)
 {
-	int r;
-	r = simple_write_end(file, mapping, pos, len, copied, page, fsdata);
+	struct inode *inode = page->mapping->host;
+	loff_t last_pos = pos + copied;
+
+	/*
+	 * No need to use i_size_read() here, the i_size
+	 * cannot change under us because we hold the i_mutex.
+	 */
+/*	printk("write_end last_pos %llx i_size %llx\n", last_pos, inode->i_size);*/
+	if (last_pos > inode->i_size)
+		i_size_write(inode, last_pos);
+
+	/* zero the stale part of the page if we did a short copy */
+	if (!PageUptodate(page)) {
+		unsigned from = pos & (PAGE_SIZE - 1);
+		if (copied < len) {
+
+			zero_user(page, from + copied, len - copied);
+		}
+		/* Set fully written pages uptodate. */
+		if (pos == page_offset(page) &&
+		    (len == PAGE_SIZE || pos + len == inode->i_size)) {
+			zero_user_segment(page, from + copied, PAGE_SIZE);
+/*			printk("write end setting uptodate\n");*/
+			SetPageUptodate(page);
+		}
+		/* XXX describe better other pages are not uptodate but they are dirty... */
+#if 0
+		SetPageUptodate(page);
+
+if we mark uptodate here,
+the zeroes are taken as gospel
+
+if we dont mark up to date,
+a read may come through
+and end up in readpage to make it up to date
+before the data is written out
+
+so fully written to pages can go uptodate?
+but not fully written to pages arent uptodate?
+how does that solve the problem?
+if not-fully-written-to page still has data pending write
+basically a read on a dirty page is a bad sign...?
+lets print that
+
+but... a read that comes through needs to check for dirty??
+on a not up todate page
+and do a write out...
+#endif
+	}
+
+	set_page_dirty(page);
+	unlock_page(page);
+	put_page(page);
+
 	mark_inode_dirty_sync(file_inode(file));
-	return r;
+	return copied;
 }
 
 static void orangefs_invalidatepage(struct page *page,
@@ -365,6 +530,9 @@ static void orangefs_invalidatepage(struct page *page,
 {
 	struct orangefs_write_range *wr;
 	wr = (struct orangefs_write_range *)page_private(page);
+
+/*	printk("invalidatepage offset %llx length %x\n", page_offset(page) + offset, length);
+	printk("invalidatepage wr->pos %llx wr->len %lx\n", wr->pos, wr->len);*/
 
 	if (offset == 0 && length == PAGE_SIZE) {
 		kfree((struct orangefs_write_range *)page_private(page));
@@ -430,6 +598,8 @@ static void orangefs_invalidatepage(struct page *page,
 	 * Above there are returns where wr is freed or where we WARN.
 	 * Thus the following runs if wr was modified above.
 	 */
+
+/*	printk("invalidatepage new wr->pos %llx wr->len %lx\n", wr->pos, wr->len);*/
 
 	orangefs_launder_page(page);
 }
@@ -599,8 +769,19 @@ int orangefs_page_mkwrite(struct vm_fault *vmf)
 {
 	struct page *page = vmf->page;
 	struct inode *inode = file_inode(vmf->vma->vm_file);
-	vm_fault_t ret = VM_FAULT_LOCKED;
+	struct orangefs_inode_s *orangefs_inode = ORANGEFS_I(inode);
+	unsigned long *bitlock = &orangefs_inode->bitlock;
+	vm_fault_t ret;
 	struct orangefs_write_range *wr;
+
+	sb_start_pagefault(inode->i_sb);
+
+	if (wait_on_bit(bitlock, 1, TASK_KILLABLE)) {
+		ret = VM_FAULT_RETRY;
+		goto out;
+	}
+
+/*	printk("mkwrite... %llx\n", page_offset(page));*/
 
 	lock_page(page);
 	if (PageDirty(page) && !PagePrivate(page)) {
@@ -610,7 +791,7 @@ int orangefs_page_mkwrite(struct vm_fault *vmf)
 		 * orangefs_writepage_locked.
 		 */
 		if (orangefs_launder_page(page)) {
-			ret = VM_FAULT_RETRY;
+			ret = VM_FAULT_LOCKED|VM_FAULT_RETRY;
 			goto out;
 		}
 	}
@@ -623,14 +804,14 @@ int orangefs_page_mkwrite(struct vm_fault *vmf)
 			goto okay;
 		} else {
 			if (orangefs_launder_page(page)) {
-				ret = VM_FAULT_RETRY;
+				ret = VM_FAULT_LOCKED|VM_FAULT_RETRY;
 				goto out;
 			}
 		}
 	}
 	wr = kmalloc(sizeof *wr, GFP_KERNEL);
 	if (!wr) {
-		ret = VM_FAULT_RETRY;
+		ret = VM_FAULT_LOCKED|VM_FAULT_RETRY;
 		goto out;
 	}
 	wr->pos = page_offset(page);
@@ -642,11 +823,10 @@ int orangefs_page_mkwrite(struct vm_fault *vmf)
 	get_page(page);
 okay:
 
-	sb_start_pagefault(inode->i_sb);
 	file_update_time(vmf->vma->vm_file);
 	if (page->mapping != inode->i_mapping) {
 		unlock_page(page);
-		ret = VM_FAULT_NOPAGE;
+		ret = VM_FAULT_LOCKED|VM_FAULT_NOPAGE;
 		goto out;
 	}
 
@@ -657,6 +837,7 @@ okay:
 	 */
 	set_page_dirty(page);
 	wait_for_stable_page(page);
+	ret = VM_FAULT_LOCKED;
 out:
 	sb_end_pagefault(inode->i_sb);
 	return ret;
@@ -686,9 +867,20 @@ static int orangefs_setattr_size(struct inode *inode, struct iattr *iattr)
 		    __func__, ret);
 		return ret;
 	}
+/*	spin_lock(&inode->i_lock);*/
 	orig_size = i_size_read(inode);
 
+/*	printk("setattr_size... %llx\n", iattr->ia_size);*/
+
 	truncate_setsize(inode, iattr->ia_size);
+/* how does writepages get called after this?? */
+/* one was already in flight?? 
+   that would at least explain the crazy offsets 
+
+I'm guessing the writepages comes from revalidate_mapping
+in which case.... maybe the spin lock
+*/
+/*	spin_unlock(&inode->i_lock);*/
 
 	new_op = op_alloc(ORANGEFS_VFS_OP_TRUNCATE);
 	if (!new_op)
@@ -734,13 +926,15 @@ int __orangefs_setattr(struct inode *inode, struct iattr *iattr)
 			} else {
 				gossip_debug(GOSSIP_UTILS_DEBUG,
 					     "User attempted to set sticky bit on non-root directory; returning EINVAL.\n");
-				return -EINVAL;
+				ret = -EINVAL;
+				goto out;
 			}
 		}
 		if (iattr->ia_mode & (S_ISUID)) {
 			gossip_debug(GOSSIP_UTILS_DEBUG,
 				     "Attempting to set setuid bit (not supported); returning EINVAL.\n");
-			return -EINVAL;
+			ret = -EINVAL;
+			goto out;
 		}
 	}
 
@@ -925,6 +1119,8 @@ static int orangefs_set_inode(struct inode *inode, void *data)
 	ORANGEFS_I(inode)->refn.khandle = ref->khandle;
 	ORANGEFS_I(inode)->attr_valid = 0;
 	hash_init(ORANGEFS_I(inode)->xattr_cache);
+	ORANGEFS_I(inode)->mapping_time = jiffies - 1;
+	ORANGEFS_I(inode)->bitlock = 0;
 	return 0;
 }
 
