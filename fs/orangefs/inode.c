@@ -251,34 +251,57 @@ static int orangefs_launder_page(struct page *);
 
 static int orangefs_readpage(struct file *file, struct page *page)
 {
+	struct orangefs_file_private *fp = file->private_data;
 	struct inode *inode = page->mapping->host;
 	struct iov_iter iter;
 	struct bio_vec bv;
 	ssize_t ret;
 	loff_t off;
 
-	off = page_offset(page);
-	bv.bv_page = page;
-	bv.bv_len = PAGE_SIZE;
-	bv.bv_offset = 0;
-	iov_iter_bvec(&iter, READ, &bv, 1, PAGE_SIZE);
-
-	if (PageDirty(page))
+	if (PageDirty(page)) {
 		orangefs_launder_page(page);
+		/*
+		 * fp is set by orangefs_file_read_iter, but the page should
+		 * not be dirty if that function ran.  If so, launder the page
+		 * and do a normal read while producing a warning.
+		 */
+		WARN_ON(fp);
+		fp = NULL;
+	}
 
-	ret = wait_for_direct_io(ORANGEFS_IO_READ, inode, &off, &iter,
-	    PAGE_SIZE, inode->i_size, NULL);
-	/* this will only zero remaining unread portions of the page data */
-	iov_iter_zero(~0U, &iter);
-	/* takes care of potential aliasing */
-	flush_dcache_page(page);
-	if (ret < 0) {
-		SetPageError(page);
-	} else {
+	if (fp) {
+		void *kaddr = kmap_atomic(page);
+		size_t n;
+		n = PAGE_SIZE;
+		if (page_offset(page) + PAGE_SIZE > fp->off + fp->len)
+			n = fp->off + fp->len - page_offset(page);
+		else
+			n = PAGE_SIZE;
+		memcpy(kaddr, fp->buf + page_offset(page) - fp->off, n);
+		kunmap_atomic(kaddr);
 		SetPageUptodate(page);
-		if (PageError(page))
-			ClearPageError(page);
 		ret = 0;
+	} else {
+		off = page_offset(page);
+		bv.bv_page = page;
+		bv.bv_len = PAGE_SIZE;
+		bv.bv_offset = 0;
+		iov_iter_bvec(&iter, READ, &bv, 1, PAGE_SIZE);
+
+		ret = wait_for_direct_io(ORANGEFS_IO_READ, inode, &off, &iter,
+		    PAGE_SIZE, inode->i_size, NULL);
+		/* this will zero remaining unread portions of the page data */
+		iov_iter_zero(~0U, &iter);
+		/* takes care of potential aliasing */
+		flush_dcache_page(page);
+		if (ret < 0) {
+			SetPageError(page);
+		} else {
+			SetPageUptodate(page);
+			if (PageError(page))
+				ClearPageError(page);
+			ret = 0;
+		}
 	}
 	/* unlock the page after the ->readpage() routine completes */
 	unlock_page(page);

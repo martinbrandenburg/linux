@@ -285,17 +285,80 @@ int orangefs_revalidate_mapping(struct inode *inode)
 static ssize_t orangefs_file_read_iter(struct kiocb *iocb,
     struct iov_iter *iter)
 {
-	int ret;
+	struct inode *inode = file_inode(iocb->ki_filp);
+	struct orangefs_file_private fp;
+	struct iov_iter big_iter;
+	int ret, has_fp = 0;
+	struct kvec kv;
+	loff_t off;
 	orangefs_stats.reads++;
 
-	down_read(&file_inode(iocb->ki_filp)->i_rwsem);
-	ret = orangefs_revalidate_mapping(file_inode(iocb->ki_filp));
+	if (iov_iter_count(iter) > PAGE_SIZE &&
+	    iov_iter_count(iter) <= orangefs_bufmap_size_query() -
+	    2*PAGE_SIZE) {
+		/*
+		 * Decreate off and increase len to nearest page.  Be careful to
+		 * to add back the decrease to off when increasing len.
+		 */
+		fp.off = iocb->ki_pos & PAGE_MASK;
+		if ((iov_iter_count(iter) + iocb->ki_pos - fp.off) % PAGE_SIZE)
+			fp.len = ((iov_iter_count(iter) + iocb->ki_pos -
+			    fp.off) | (PAGE_SIZE - 1)) + 1;
+		else
+			fp.len = iov_iter_count(iter) + iocb->ki_pos - fp.off;
+
+		fp.buf = kmalloc(fp.len, GFP_KERNEL);
+		if (!fp.buf)
+			return -ENOMEM;
+
+		kv.iov_base = fp.buf;
+		kv.iov_len = fp.len;
+		iov_iter_kvec(&big_iter, READ, &kv, 1, fp.len);
+
+		/*
+		 * Any error below this point will be handled by freeing fp and
+		 * allowing the normal readpage process to commence.
+		 */
+
+		ret = filemap_write_and_wait_range(inode->i_mapping, fp.off,
+		    fp.off + fp.len);
+		if (ret) {
+			kfree(fp.buf);
+			return ret;
+		}
+
+		off = fp.off;
+		ret = wait_for_direct_io(ORANGEFS_IO_READ, inode, &off,
+		    &big_iter, fp.len, inode->i_size, NULL);
+		if (ret < 0) {
+			kfree(fp.buf);
+		} else if (ret < fp.len) {
+			/* XXX: Could also be short read... */
+			kfree(fp.buf);
+		} else {
+			has_fp = 1;
+		}
+	}
+
+	down_read(&inode->i_rwsem);
+
+	if (has_fp) {
+		WARN_ON(iocb->ki_filp->private_data);
+		iocb->ki_filp->private_data = &fp;
+	}
+
+	ret = orangefs_revalidate_mapping(inode);
 	if (ret)
 		goto out;
 
 	ret = generic_file_read_iter(iocb, iter);
 out:
-	up_read(&file_inode(iocb->ki_filp)->i_rwsem);
+	if (has_fp) {
+		WARN_ON(iocb->ki_filp->private_data != &fp);
+		iocb->ki_filp->private_data = NULL;
+		kfree(fp.buf);
+	}
+	up_read(&inode->i_rwsem);
 	return ret;
 }
 

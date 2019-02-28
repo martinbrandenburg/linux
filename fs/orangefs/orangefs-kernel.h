@@ -240,6 +240,12 @@ struct orangefs_write_range {
 
 extern struct orangefs_stats orangefs_stats;
 
+struct orangefs_file_private {
+	loff_t off;
+	void *buf;
+	size_t len;
+};
+
 /*
  * NOTE: See Documentation/filesystems/porting for information
  * on implementing FOO_I and properly accessing fs private data
